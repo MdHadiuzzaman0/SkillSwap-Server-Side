@@ -22,6 +22,7 @@ async function run() {
     await client.connect();
     const database = client.db("SkillSwap");
     const userCollection = database.collection("userCollection");
+    const taskCollection = database.collection("taskCollection");
 
     //insert create profile data
     app.post("/user", async (req, res) => {
@@ -69,6 +70,34 @@ async function run() {
         res.status(500).json({ success: false, error: error.message });
       }
     });
+
+    //get all task 
+    app.get("/browse-tasks", async (req, res) => {
+      try {
+        const result = await taskCollection.find().toArray();
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: "Failed to fetch tasks" });
+      }
+    });
+
+    //get task details
+    app.get('/browse-tasks/:id', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const query = { _id: new ObjectId(id) };
+        const task = await taskCollection.findOne(query);
+        if (!task) {
+          return res.status(404).json({ message: "Task not found" });
+        }
+        res.status(200).json(task);
+      } catch (error) {
+        console.error("Error fetching task details by ID:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+      }
+    });
+
+
 
 
 
