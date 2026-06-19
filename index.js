@@ -23,7 +23,7 @@ async function run() {
     const database = client.db("SkillSwap");
     const userCollection = database.collection("userCollection");
     const taskCollection = database.collection("taskCollection");
-    const proposalCollection = database.collection("proposalCollection");
+    const proposalsCollection = database.collection("proposalsCollection");
 
     //insert create profile data
     app.post("/user", async (req, res) => {
@@ -38,7 +38,7 @@ async function run() {
           });
         }
 
-        // Since it's a completely separate collection and first-time entry, we use insertOne
+        // Since it's a completely separate collection and last-time entry, we use insertOne
         const result = await userCollection.insertOne(profileData);
 
         // Return clean success response wrapper back to Next.js front-end
@@ -144,20 +144,21 @@ async function run() {
     //update profile data
     app.patch('/users/:email', async (req, res) => {
       try {
-        const userEmail = req.params.email; 
-        const updatedData = req.body; 
+        const userEmail = req.params.email;
+        const updatedData = req.body;
         const filter = { email: userEmail };
 
         const updateDoc = {
           $set: {
-            name: updatedData.name,
+            firstName: updatedData.firstName,
+            lastName: updatedData.lastName,
             image: updatedData.image,
-            skills: updatedData.skills, 
+            skills: updatedData.skills,
             bio: updatedData.bio,
-            hourly_rate: updatedData.hourly_rate,
+            hourlyRate: updatedData.hourlyRate,
           },
         };
-        const result = await usersCollection.updateOne(filter, updateDoc);
+        const result = await userCollection.updateOne(filter, updateDoc);
         if (result.matchedCount === 0) {
           return res.status(404).send({ success: false, message: "User profile not found" });
         }
@@ -170,7 +171,7 @@ async function run() {
     });
 
     //update proposal info, task submit
-    app.patch("/proposals/update/:id", async (req, res) => {
+    app.patch("/proposals-update/:id", async (req, res) => {
       try {
         const id = req.params.id;
         const { status, deliverable_url } = req.body;
@@ -200,6 +201,46 @@ async function run() {
       }
     });
 
+    //get completed task info
+    app.get("/earnings/:email", async (req, res) => {
+      try {
+        const freelancerEmail = req.params.email;
+        const query = {
+          freelancer_email: freelancerEmail,
+          status: "completed"
+        };
+        const result = await proposalsCollection.find(query).sort({ updated_at: -1 }).toArray();
+        res.status(200).send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Internal server error" });
+      }
+    });
+
+    //insert posted data
+    app.post("/post-task", async (req, res) => {
+      try {
+        const newTask = req.body;
+        if (!newTask.title || !newTask.clientEmail) {
+          return res.status(400).json({ success: false, message: "Required data is missing." });
+        }
+        const result = await taskCollection.insertOne(newTask);
+
+        if (result.insertedId) {
+          return res.status(201).json({
+            success: true,
+            message: "Task published successfully!",
+            taskId: result.insertedId
+          });
+        } else {
+          return res.status(500).json({ success: false, message: "Failed to insert task." });
+        }
+
+      } catch (error) {
+        console.error("Express Error inside /tasks POST:", error);
+        return res.status(500).json({ success: false, message: error.message || "Internal Server Error" });
+      }
+    });
 
 
 
