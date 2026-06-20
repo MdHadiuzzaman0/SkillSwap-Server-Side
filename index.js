@@ -217,6 +217,7 @@ async function run() {
       }
     });
 
+    //client section
     //insert posted data
     app.post("/post-task", async (req, res) => {
       try {
@@ -242,6 +243,78 @@ async function run() {
       }
     });
 
+    //get posted task data
+    app.get("/my-tasks/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const tasks = await taskCollection.find({ clientEmail: email }).sort({ createdAt: -1 }).toArray();
+
+        res.status(200).json({ success: true, tasks });
+      } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+      }
+    });
+
+    //get proposed data through client email - post task
+    app.get("/client-proposals/:email", async (req, res) => {
+      try {
+        const clientEmail = req.params.email;
+        const submissions = await proposalsCollection.find({ client_email: clientEmail }).toArray();
+        return res.status(200).json({ success: true, submissions });
+      } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+      }
+    });
+
+    //update posted data info
+    app.patch("/task-update/:id", async (req, res) => {
+      try {
+        const taskId = req.params.id;
+        const updatedFields = req.body;
+        if (Object.keys(updatedFields).length === 0) {
+          return res.status(400).json({ success: false, message: "No data provided for update" });
+        }
+        const result = await taskCollection.updateOne(
+          { _id: new ObjectId(taskId) },
+          { $set: updatedFields }
+        );
+        if (result.matchedCount === 1) {
+          return res.status(200).json({
+            success: true,
+            message: "Task updated successfully!",
+          });
+        } else {
+          return res.status(404).json({
+            success: false,
+            message: "Task not found or no changes made.",
+          });
+        }
+
+      } catch (error) {
+        console.error("Express Error inside PATCH /task-update/:id:", error);
+        return res.status(500).json({
+          success: false,
+          message: error.message || "Internal Server Error",
+        });
+      }
+    });
+
+    //delete posted data
+    app.delete('/tasks/:id', async (req, res) => {
+      try {
+        const taskId = req.params.taskId;
+        const query = { _id: new ObjectId(taskId) };
+        const result = await taskCollection.deleteOne(query);
+
+        if (result.deletedCount === 1) {
+          res.status(200).send({ success: true, message: "Task deleted successfully" });
+        } else {
+          res.status(404).send({ success: false, message: "Task not found" });
+        }
+      } catch (error) {
+        res.status(500).send({ success: false, message: "Internal Server Error", error: error.message });
+      }
+    });
 
 
 
