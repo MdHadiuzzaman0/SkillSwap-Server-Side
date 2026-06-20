@@ -316,6 +316,25 @@ async function run() {
       }
     });
 
+    //update status for accept/ignore button
+    app.patch("/proposal-status/:id", async (req, res) => {
+      try {
+        const proposalId = req.params.id;
+        const { status } = req.body;
+        const result = await proposalCollection.updateOne(
+          { _id: new ObjectId(proposalId) },
+          { $set: { status: status } }tgi
+        );
+
+        if (result.matchedCount === 1) {
+          return res.status(200).json({ success: true, message: `Proposal ${status} successfully!` });
+        }
+        return res.status(404).json({ success: false, message: "Proposal not found" });
+      } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+      }
+    });
+
 
 
 
