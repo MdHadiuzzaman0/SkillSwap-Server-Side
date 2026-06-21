@@ -73,7 +73,7 @@ async function run() {
       }
     });
 
-    //get all proposal 
+    //get all task
     app.get("/browse-tasks", async (req, res) => {
       try {
         const result = await taskCollection.find().toArray();
@@ -303,7 +303,7 @@ async function run() {
     //delete posted data
     app.delete('/tasks/:id', async (req, res) => {
       try {
-        const taskId = req.params.taskId;
+        const taskId = req.params.id;
         const query = { _id: new ObjectId(taskId) };
         const result = await taskCollection.deleteOne(query);
 
@@ -339,12 +339,7 @@ async function run() {
     //update status afte payment
     app.post("/api/payments/confirm", async (req, res) => {
       try {
-        const { infoField } = req.body;
-        if (!infoField) {
-          return res.status(400).json({ success: false, message: "Missing infoField in body" });
-        }
-
-        const { taskId, proposalId, sessionId } = infoField;
+        const { taskId, proposalId, sessionId } = req.body;
 
         if (!taskId || !proposalId || !sessionId) {
           return res.status(400).json({
@@ -352,7 +347,7 @@ async function run() {
             message: "Missing required fields: taskId, proposalId, or sessionId"
           });
         }
-        const proposalUpdate = await proposalCollection.updateOne(
+        const proposalUpdate = await proposalsCollection.updateOne(
           { _id: new ObjectId(proposalId) },
           { $set: { status: "in-progress" } }
         );
@@ -361,7 +356,7 @@ async function run() {
           { $set: { status: "closed" } }
         );
         const taskData = await taskCollection.findOne({ _id: new ObjectId(taskId) });
-        const proposalData = await proposalCollection.findOne({ _id: new ObjectId(proposalId) });
+        const proposalData = await proposalsCollection.findOne({ _id: new ObjectId(proposalId) });
         const newPayment = {
           client_email: taskData?.clientEmail || "",
           freelancer_email: proposalData?.freelancer_email || "",
@@ -393,6 +388,37 @@ async function run() {
       } catch (error) {
         console.error("Express Payment Confirm Error:", error);
         return res.status(500).json({ success: false, message: error.message });
+      }
+    });
+
+    //admin
+    // ১. সব ইউজার ডাটা পাওয়ার রাউট
+    app.get("/admin/all-users", async (req, res) => {
+      try {
+        const result = await userCollection.find().toArray();
+        res.status(200).json({ success: true, users: result });
+      } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+    // ২. সব পেমেন্ট বা ট্রানজেকশন হিস্ট্রি পাওয়ার রাউট
+    app.get("/admin/payments", async (req, res) => {
+      try {
+        const result = await paymentCollection.find().toArray();
+        res.status(200).json({ success: true, payments: result });
+      } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+    // ৩. একটিভ টাস্কের জন্য সব প্রপোজাল পাওয়ার রাউট
+    app.get("/admin/all-proposals", async (req, res) => {
+      try {
+        const result = await proposalsCollection.find().toArray();
+        res.status(200).json({ success: true, proposals: result });
+      } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
       }
     });
 
