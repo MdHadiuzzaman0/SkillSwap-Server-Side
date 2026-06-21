@@ -24,6 +24,7 @@ async function run() {
     const userCollection = database.collection("userCollection");
     const taskCollection = database.collection("taskCollection");
     const proposalsCollection = database.collection("proposalsCollection");
+    const paymentCollection = database.collection("paymentCollection");
 
     //insert create profile data
     app.post("/user", async (req, res) => {
@@ -323,7 +324,7 @@ async function run() {
         const { status } = req.body;
         const result = await proposalCollection.updateOne(
           { _id: new ObjectId(proposalId) },
-          { $set: { status: status } }tgi
+          { $set: { status: status } }
         );
 
         if (result.matchedCount === 1) {
@@ -335,6 +336,65 @@ async function run() {
       }
     });
 
+    //update status afte payment
+    app.post("/api/payments/confirm", async (req, res) => {
+      try {
+        const { infoField } = req.body;
+        if (!infoField) {
+          return res.status(400).json({ success: false, message: "Missing infoField in body" });
+        }
+
+        const { taskId, proposalId, sessionId } = infoField;
+
+        if (!taskId || !proposalId || !sessionId) {
+          return res.status(400).json({
+            success: false,
+            message: "Missing required fields: taskId, proposalId, or sessionId"
+          });
+        }
+        const proposalUpdate = await proposalCollection.updateOne(
+          { _id: new ObjectId(proposalId) },
+          { $set: { status: "in-progress" } }
+        );
+        const taskUpdate = await taskCollection.updateOne(
+          { _id: new ObjectId(taskId) },
+          { $set: { status: "closed" } }
+        );
+        const taskData = await taskCollection.findOne({ _id: new ObjectId(taskId) });
+        const proposalData = await proposalCollection.findOne({ _id: new ObjectId(proposalId) });
+        const newPayment = {
+          client_email: taskData?.clientEmail || "",
+          freelancer_email: proposalData?.freelancer_email || "",
+          task_id: taskId,
+          task_title: taskData?.title || "",
+          amount: Number(proposalData?.proposed_budget || 0),
+          transaction_id: sessionId,
+          payment_status: "succeeded",
+          paid_at: new Date()
+        };
+
+        const paymentInsert = await paymentCollection.insertOne(newPayment);
+        if (
+          proposalUpdate.modifiedCount > 0 &&
+          taskUpdate.modifiedCount > 0 &&
+          paymentInsert.insertedId
+        ) {
+          return res.status(200).json({
+            success: true,
+            message: "Payment successfully verified. Database collections updated!",
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "Failed to update statuses. Please check if IDs are correct.",
+          });
+        }
+
+      } catch (error) {
+        console.error("Express Payment Confirm Error:", error);
+        return res.status(500).json({ success: false, message: error.message });
+      }
+    });
 
 
 
