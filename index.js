@@ -336,7 +336,7 @@ async function run() {
       }
     });
 
-    //update status afte payment
+    //update status after payment
     app.post("/api/payments/confirm", async (req, res) => {
       try {
         const { taskId, proposalId, sessionId } = req.body;
