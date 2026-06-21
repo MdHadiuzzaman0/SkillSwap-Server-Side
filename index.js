@@ -149,17 +149,26 @@ async function run() {
         const updatedData = req.body;
         const filter = { email: userEmail };
 
+        const fieldsToUpdate = {};
+        if (updatedData.firstName !== undefined) fieldsToUpdate.firstName = updatedData.firstName;
+        if (updatedData.lastName !== undefined) fieldsToUpdate.lastName = updatedData.lastName;
+        if (updatedData.image !== undefined) fieldsToUpdate.image = updatedData.image;
+        if (updatedData.bio !== undefined) fieldsToUpdate.bio = updatedData.bio;
+
+        if (updatedData.companyName !== undefined) {
+          fieldsToUpdate.companyName = updatedData.companyName;
+          fieldsToUpdate.industry = updatedData.industry;
+        } else if (updatedData.hourlyRate !== undefined || updatedData.skills !== undefined) {
+          fieldsToUpdate.skills = updatedData.skills;
+          fieldsToUpdate.hourlyRate = updatedData.hourlyRate;
+        }
+
         const updateDoc = {
-          $set: {
-            firstName: updatedData.firstName,
-            lastName: updatedData.lastName,
-            image: updatedData.image,
-            skills: updatedData.skills,
-            bio: updatedData.bio,
-            hourlyRate: updatedData.hourlyRate,
-          },
+          $set: fieldsToUpdate,
         };
+
         const result = await userCollection.updateOne(filter, updateDoc);
+
         if (result.matchedCount === 0) {
           return res.status(404).send({ success: false, message: "User profile not found" });
         }
@@ -322,7 +331,7 @@ async function run() {
       try {
         const proposalId = req.params.id;
         const { status } = req.body;
-        const result = await proposalCollection.updateOne(
+        const result = await proposalsCollection.updateOne(
           { _id: new ObjectId(proposalId) },
           { $set: { status: status } }
         );
@@ -392,7 +401,7 @@ async function run() {
     });
 
     //admin
-    // ১. সব ইউজার ডাটা পাওয়ার রাউট
+    // get all user data
     app.get("/admin/all-users", async (req, res) => {
       try {
         const result = await userCollection.find().toArray();
@@ -402,7 +411,7 @@ async function run() {
       }
     });
 
-    // ২. সব পেমেন্ট বা ট্রানজেকশন হিস্ট্রি পাওয়ার রাউট
+    // get all payment data
     app.get("/admin/payments", async (req, res) => {
       try {
         const result = await paymentCollection.find().toArray();
@@ -412,7 +421,7 @@ async function run() {
       }
     });
 
-    // ৩. একটিভ টাস্কের জন্য সব প্রপোজাল পাওয়ার রাউট
+    // get all proposal data
     app.get("/admin/all-proposals", async (req, res) => {
       try {
         const result = await proposalsCollection.find().toArray();
