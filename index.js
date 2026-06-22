@@ -129,6 +129,39 @@ async function run() {
       }
     });
 
+    //get top freelancer 
+    app.get("/top-freelancers-home", async (req, res) => {
+      try {
+        const topThree = await userCollection
+          .find({ role: "freelancer" })
+          .sort({ totalEarnings: -1 })
+          .limit(3)
+          .toArray();
+
+        return res.status(200).json({ success: true, data: topThree });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ success: false, message: "Server Error" });
+      }
+    });
+
+    //get freelancer with proposal
+    app.get("/api/freelancers-with-proposals", async (req, res) => {
+      try {
+        const users = await userCollection.find({}).toArray();
+        const proposals = await proposalsCollection.find({}).toArray();
+        return res.status(200).json({
+          success: true,
+          users,
+          proposals
+        });
+      } catch (error) {
+        console.error("Combined data fetch error:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
+      }
+    });
+
+    //freelancer
     // proposal submit
     app.post('/proposals', async (req, res) => {
       try {
