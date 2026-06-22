@@ -145,15 +145,16 @@ async function run() {
       }
     });
 
-    //get freelancer with proposal
-    app.get("/api/freelancers-with-proposals", async (req, res) => {
+    //get all data, proposal, task, user collection
+    app.get("/api/allData", async (req, res) => {
       try {
         const users = await userCollection.find({}).toArray();
         const proposals = await proposalsCollection.find({}).toArray();
+        const tasks = await taskCollection.find({}).toArray();
         return res.status(200).json({
           success: true,
           users,
-          proposals
+          proposals, tasks
         });
       } catch (error) {
         console.error("Combined data fetch error:", error);
@@ -520,6 +521,29 @@ async function run() {
         res.status(200).json({ success: true, proposals: result });
       } catch (error) {
         res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+    //isBlocked status update
+    app.patch("/api/users/:id/block", async (req, res) => {
+      try {
+        const userId = req.params.id;
+        const { isBlocked } = req.body; // ফ্রন্টএন্ড থেকে true অথবা false পাঠানো হবে
+
+        const filter = { _id: new ObjectId(userId) };
+        const updateDoc = {
+          $set: { isBlocked: isBlocked }, // ডাটাবেজে স্ট্যাটাস আপডেট
+        };
+
+        const result = await userCollection.updateOne(filter, updateDoc);
+
+        if (result.modifiedCount > 0) {
+          return res.status(200).json({ success: true, message: `User ${isBlocked ? 'blocked' : 'unblocked'} successfully` });
+        }
+        return res.status(400).json({ success: false, message: "No changes made" });
+      } catch (error) {
+        console.error("Error blocking user:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
       }
     });
 
