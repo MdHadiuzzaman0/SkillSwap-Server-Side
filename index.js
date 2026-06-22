@@ -83,34 +83,32 @@ async function run() {
     //   }
     // });
 
-    //get all, filter, search data
+    //get all, filter, search data with pagination
     app.get("/tasks", async (req, res) => {
       try {
-        const { category, search } = req.query;
+        const { category, search, page, limit } = req.query;
+        
+        const currentPage = parseInt(page) || 1;
+        const currentLimit = parseInt(limit) || 9;
+        const skip = (currentPage - 1) * currentLimit;
 
-        // শুধু open স্ট্যাটাসের টাস্ক ফিল্টার হবে
-        let query = {};
+        let query = { status: "open" };
 
-        // ক্যাটাগরি ফিল্টার লজিক
         if (category && category !== "All") {
           query.category = { $regex: category, $options: "i" };
         }
-
-        // টাইটেল সার্চ লজিক
         if (search) {
           query.title = { $regex: search, $options: "i" };
         }
-
-        // নতুন টাস্কগুলো আগে দেখাবে (sort)
-        const tasks = await taskCollection.find(query).sort({ createdAt: -1 }).toArray();
-
+        const totalTasks = await taskCollection.countDocuments(query);
+        const tasks = await taskCollection.find(query) .skip(skip) .limit(currentLimit) .toArray();
         return res.status(200).json({
           success: true,
-          count: tasks.length,
+          total: totalTasks, 
           data: tasks
         });
       } catch (error) {
-        console.error("Error fetching tasks:", error);
+        console.error(error);
         return res.status(500).json({ success: false, message: "Server Error" });
       }
     });
