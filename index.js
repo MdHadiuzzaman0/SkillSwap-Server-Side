@@ -87,7 +87,7 @@ async function run() {
     app.get("/tasks", async (req, res) => {
       try {
         const { category, search, page, limit } = req.query;
-        
+
         const currentPage = parseInt(page) || 1;
         const currentLimit = parseInt(limit) || 9;
         const skip = (currentPage - 1) * currentLimit;
@@ -101,10 +101,10 @@ async function run() {
           query.title = { $regex: search, $options: "i" };
         }
         const totalTasks = await taskCollection.countDocuments(query);
-        const tasks = await taskCollection.find(query) .skip(skip) .limit(currentLimit) .toArray();
+        const tasks = await taskCollection.find(query).skip(skip).limit(currentLimit).toArray();
         return res.status(200).json({
           success: true,
-          total: totalTasks, 
+          total: totalTasks,
           data: tasks
         });
       } catch (error) {
@@ -254,6 +254,35 @@ async function run() {
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Internal server error" });
+      }
+    });
+
+    //update freelancer earnings
+    app.post("/update-earnings", async (req, res) => {
+      try {
+        const { email, totalEarnings } = req.body;
+
+        if (!email) {
+          return res.status(400).json({ success: false, message: "Email is required" });
+        }
+
+        // ১. ইউজার কালেকশনে ফ্রিল্যান্সারের ইমেইল খুঁজে totalEarnings আপডেট করা
+        const result = await userCollection.updateOne(
+          { email: email },
+          { $set: { totalEarnings: totalEarnings } }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ success: false, message: "Freelancer not found" });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: "Earnings synced successfully in profile!"
+        });
+      } catch (error) {
+        console.error("Backend sync error:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
       }
     });
 
