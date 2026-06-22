@@ -74,12 +74,44 @@ async function run() {
     });
 
     //get all task
-    app.get("/browse-tasks", async (req, res) => {
+    // app.get("/browse-tasks", async (req, res) => {
+    //   try {
+    //     const result = await taskCollection.find().toArray();
+    //     res.json(result);
+    //   } catch (error) {
+    //     res.status(500).json({ error: "Failed to fetch tasks" });
+    //   }
+    // });
+
+    //get all, filter, search data
+    app.get("/tasks", async (req, res) => {
       try {
-        const result = await taskCollection.find().toArray();
-        res.json(result);
+        const { category, search } = req.query;
+
+        // শুধু open স্ট্যাটাসের টাস্ক ফিল্টার হবে
+        let query = {};
+
+        // ক্যাটাগরি ফিল্টার লজিক
+        if (category && category !== "All") {
+          query.category = { $regex: category, $options: "i" };
+        }
+
+        // টাইটেল সার্চ লজিক
+        if (search) {
+          query.title = { $regex: search, $options: "i" };
+        }
+
+        // নতুন টাস্কগুলো আগে দেখাবে (sort)
+        const tasks = await taskCollection.find(query).sort({ createdAt: -1 }).toArray();
+
+        return res.status(200).json({
+          success: true,
+          count: tasks.length,
+          data: tasks
+        });
       } catch (error) {
-        res.status(500).json({ error: "Failed to fetch tasks" });
+        console.error("Error fetching tasks:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
       }
     });
 
