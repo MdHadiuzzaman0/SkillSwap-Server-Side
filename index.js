@@ -3,6 +3,7 @@ const app = express();
 require("dotenv").config();
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { jwtVerify, createRemoteJWKSet } = require("jose-cjs");
 const uri = process.env.MONGODB_URL;
 const port = process.env.PORT;
 
@@ -17,6 +18,29 @@ const client = new MongoClient(uri, {
   }
 });
 
+const JWKS = createRemoteJWKSet(
+      new URL(`${process.env.CLIENT_URL}/api/auth/jwks`) 
+    )
+
+const verifyToken = async (req, res, next) => {
+  const authHeader = req?.headers.authorization
+  if(!authHeader){
+    return res.status(401).json({message: "Unauthorized"})
+  }
+  const token = authHeader?.split(" ")[1]
+  if(!token){
+     return res.status(401).json({message: "Unauthorized"})  
+  }
+  try{
+    const { payload } = await jwtVerify(token, JWKS) 
+    // console.log(payload)
+    next()
+  } 
+  catch (error) {
+    return res.status(403).json({message: "Forbidden"})
+  }
+}
+
 async function run() {
   try {
     await client.connect();
@@ -27,7 +51,7 @@ async function run() {
     const paymentCollection = database.collection("paymentCollection");
 
     //insert create profile data
-    app.post("/user", async (req, res) => {
+    app.post("/user", verifyToken, async (req, res) => {
       try {
         const profileData = req.body;
 
@@ -59,7 +83,7 @@ async function run() {
     });
 
     //get user info
-    app.get("/user/:email", async (req, res) => {
+    app.get("/user/:email", verifyToken, async (req, res) => {
       try {
         const userEmail = req.params.email;
         const user = await userCollection.findOne({ email: userEmail });
@@ -74,17 +98,17 @@ async function run() {
     });
 
     //get all task
-    // app.get("/browse-tasks", async (req, res) => {
-    //   try {
-    //     const result = await taskCollection.find().toArray();
-    //     res.json(result);
-    //   } catch (error) {
-    //     res.status(500).json({ error: "Failed to fetch tasks" });
-    //   }
-    // });
+    app.get("/browse-tasks", verifyToken,  async (req, res) => {
+      try {
+        const result = await taskCollection.find().toArray();
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: "Failed to fetch tasks" });
+      }
+    });
 
     //get all, filter, search data with pagination
-    app.get("/tasks", async (req, res) => {
+    app.get("/tasks", verifyToken, async (req, res) => {
       try {
         const { category, search, page, limit } = req.query;
 
@@ -114,7 +138,7 @@ async function run() {
     });
 
     //get task details
-    app.get('/browse-tasks/:id', async (req, res) => {
+    app.get('/browse-tasks/:id', verifyToken, async (req, res) => {
       try {
         const { id } = req.params;
         const query = { _id: new ObjectId(id) };
@@ -141,23 +165,6 @@ async function run() {
         return res.status(200).json({ success: true, data: topThree });
       } catch (error) {
         console.error(error);
-        return res.status(500).json({ success: false, message: "Server Error" });
-      }
-    });
-
-    //get all data, proposal, task, user collection
-    app.get("/api/allData", async (req, res) => {
-      try {
-        const users = await userCollection.find({}).toArray();
-        const proposals = await proposalsCollection.find({}).toArray();
-        const tasks = await taskCollection.find({}).toArray();
-        return res.status(200).json({
-          success: true,
-          users,
-          proposals, tasks
-        });
-      } catch (error) {
-        console.error("Combined data fetch error:", error);
         return res.status(500).json({ success: false, message: "Server Error" });
       }
     });
@@ -194,7 +201,7 @@ async function run() {
     });
 
     //get proposal data
-    app.get('/proposals/:freelancerEmail', async (req, res) => {
+    app.get('/proposals/:freelancerEmail', verifyToken, async (req, res) => {
       try {
         const email = req.params.freelancerEmail;
         const query = { freelancer_email: email };
@@ -206,8 +213,8 @@ async function run() {
       }
     });
 
-    //update profile data
-    app.patch('/users/:email', async (req, res) => {
+    //update profile data - used for freelancer & client
+    app.patch('/users/:email', verifyToken, async (req, res) => {
       try {
         const userEmail = req.params.email;
         const updatedData = req.body;
@@ -245,7 +252,7 @@ async function run() {
     });
 
     //update proposal info, task submit
-    app.patch("/proposals-update/:id", async (req, res) => {
+    app.patch("/proposals-update/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const { status, deliverable_url } = req.body;
@@ -275,8 +282,8 @@ async function run() {
       }
     });
 
-    //get completed task info
-    app.get("/earnings/:email", async (req, res) => {
+    //get completed task info - total earnings
+    app.get("/earnings/:email", verifyToken, async (req, res) => {
       try {
         const freelancerEmail = req.params.email;
         const query = {
@@ -322,7 +329,7 @@ async function run() {
 
     //client section
     //insert posted data
-    app.post("/post-task", async (req, res) => {
+    app.post("/post-task", verifyToken, async (req, res) => {
       try {
         const newTask = req.body;
         if (!newTask.title || !newTask.clientEmail) {
@@ -347,7 +354,7 @@ async function run() {
     });
 
     //get posted task data
-    app.get("/my-tasks/:email", async (req, res) => {
+    app.get("/my-tasks/:email", verifyToken, async (req, res) => {
       try {
         const email = req.params.email;
         const tasks = await taskCollection.find({ clientEmail: email }).sort({ createdAt: -1 }).toArray();
@@ -359,7 +366,7 @@ async function run() {
     });
 
     //get proposed data through client email - post task
-    app.get("/client-proposals/:email", async (req, res) => {
+    app.get("/client-proposals/:email", verifyToken, async (req, res) => {
       try {
         const clientEmail = req.params.email;
         const submissions = await proposalsCollection.find({ client_email: clientEmail }).toArray();
@@ -420,7 +427,7 @@ async function run() {
     });
 
     //update status for accept/ignore button
-    app.patch("/proposal-status/:id", async (req, res) => {
+    app.patch("/proposal-status/:id", verifyToken, async (req, res) => {
       try {
         const proposalId = req.params.id;
         const { status } = req.body;
@@ -505,7 +512,7 @@ async function run() {
     });
 
     // get all payment data
-    app.get("/admin/payments", async (req, res) => {
+    app.get("/admin/payments", verifyToken, async (req, res) => {
       try {
         const result = await paymentCollection.find().toArray();
         res.status(200).json({ success: true, payments: result });
@@ -525,7 +532,7 @@ async function run() {
     });
 
     //isBlocked status update
-    app.patch("/api/users/:id/block", async (req, res) => {
+    app.patch("/api/users/:id/block",verifyToken, async (req, res) => {
       try {
         const userId = req.params.id;
         const { isBlocked } = req.body; // ফ্রন্টএন্ড থেকে true অথবা false পাঠানো হবে
@@ -543,6 +550,24 @@ async function run() {
         return res.status(400).json({ success: false, message: "No changes made" });
       } catch (error) {
         console.error("Error blocking user:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
+      }
+    });
+
+    //finishing
+    //get all data, proposal, task, user collection
+    app.get("/api/allData", verifyToken, async (req, res) => {
+      try {
+        const users = await userCollection.find({}).toArray();
+        const proposals = await proposalsCollection.find({}).toArray();
+        const tasks = await taskCollection.find({}).toArray();
+        return res.status(200).json({
+          success: true,
+          users,
+          proposals, tasks
+        });
+      } catch (error) {
+        console.error("Combined data fetch error:", error);
         return res.status(500).json({ success: false, message: "Server Error" });
       }
     });
