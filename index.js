@@ -19,25 +19,25 @@ const client = new MongoClient(uri, {
 });
 
 const JWKS = createRemoteJWKSet(
-      new URL(`${process.env.CLIENT_URL}/api/auth/jwks`) 
-    )
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
+)
 
 const verifyToken = async (req, res, next) => {
   const authHeader = req?.headers.authorization
-  if(!authHeader){
-    return res.status(401).json({message: "Unauthorized"})
+  if (!authHeader) {
+    return res.status(401).json({ message: "Unauthorized" })
   }
   const token = authHeader?.split(" ")[1]
-  if(!token){
-     return res.status(401).json({message: "Unauthorized"})  
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized" })
   }
-  try{
-    const { payload } = await jwtVerify(token, JWKS) 
+  try {
+    const { payload } = await jwtVerify(token, JWKS)
     // console.log(payload)
     next()
-  } 
+  }
   catch (error) {
-    return res.status(403).json({message: "Forbidden"})
+    return res.status(403).json({ message: "Forbidden" })
   }
 }
 
@@ -83,7 +83,7 @@ async function run() {
     });
 
     //get user info
-    app.get("/user/:email", verifyToken, async (req, res) => {
+    app.get("/user/:email", async (req, res) => {
       try {
         const userEmail = req.params.email;
         const user = await userCollection.findOne({ email: userEmail });
@@ -98,7 +98,7 @@ async function run() {
     });
 
     //get all task
-    app.get("/browse-tasks", verifyToken,  async (req, res) => {
+    app.get("/browse-tasks", verifyToken, async (req, res) => {
       try {
         const result = await taskCollection.find().toArray();
         res.json(result);
@@ -108,7 +108,7 @@ async function run() {
     });
 
     //get all, filter, search data with pagination
-    app.get("/tasks", verifyToken, async (req, res) => {
+    app.get("/tasks", async (req, res) => {
       try {
         const { category, search, page, limit } = req.query;
 
@@ -116,7 +116,7 @@ async function run() {
         const currentLimit = parseInt(limit) || 9;
         const skip = (currentPage - 1) * currentLimit;
 
-        let query = { status: "open" };
+        let query = {};
 
         if (category && category !== "All") {
           query.category = { $regex: category, $options: "i" };
@@ -170,6 +170,33 @@ async function run() {
     });
 
     //freelancer
+    //get freelancer profile info
+    app.get("/profile/:email", verifyToken, async (req, res) => {
+      try {
+        const { email } = req.params; // ফ্রন্টএন্ড থেকে পাঠানো ইমেইল নেওয়া হলো
+
+        if (!email) {
+          return res.status(400).json({
+            success: false,
+            message: "Email parameter is required."
+          })
+        };
+
+        const freelancerProfile = await userCollection.findOne({ email: email });
+        return res.status(200).json({
+          success: true,
+          data: freelancerProfile
+        });
+
+      } catch (error) {
+        console.error("Error in /api/profile route:", error);
+        return res.status(500).json({
+          success: false,
+          message: "Internal Server Error"
+        });
+      }
+    });
+
     // proposal submit
     app.post('/proposals', async (req, res) => {
       try {
@@ -299,7 +326,7 @@ async function run() {
     });
 
     //update freelancer earnings
-    app.post("/update-earnings", async (req, res) => {
+    app.post("/update-earnings", verifyToken, async (req, res) => {
       try {
         const { email, totalEarnings } = req.body;
 
@@ -307,7 +334,6 @@ async function run() {
           return res.status(400).json({ success: false, message: "Email is required" });
         }
 
-        // ১. ইউজার কালেকশনে ফ্রিল্যান্সারের ইমেইল খুঁজে totalEarnings আপডেট করা
         const result = await userCollection.updateOne(
           { email: email },
           { $set: { totalEarnings: totalEarnings } }
@@ -500,6 +526,26 @@ async function run() {
       }
     });
 
+    //get paid tasks database
+    app.get("/payments/:email", verifyToken, async (req, res) => {
+      try {
+        const email = req.params.email;
+        const query = { client_email: email };
+        const payments = await paymentCollection.find(query).sort({ payment_date: -1 }).toArray();
+
+        res.status(200).json({
+          success: true,
+          data: payments,
+        });
+      } catch (error) {
+        console.error("Error fetching payments:", error);
+        res.status(500).json({
+          success: false,
+          message: "Internal server error while fetching payments",
+        });
+      }
+    });
+
     //admin
     // get all user data
     app.get("/admin/all-users", async (req, res) => {
@@ -514,7 +560,7 @@ async function run() {
     // get all payment data
     app.get("/admin/payments", verifyToken, async (req, res) => {
       try {
-        const result = await paymentCollection.find().toArray();
+        const result = await paymentCollection.find().sort({ paid_at: -1 }).toArray();
         res.status(200).json({ success: true, payments: result });
       } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -532,7 +578,7 @@ async function run() {
     });
 
     //isBlocked status update
-    app.patch("/api/users/:id/block",verifyToken, async (req, res) => {
+    app.patch("/api/users/:id/block", verifyToken, async (req, res) => {
       try {
         const userId = req.params.id;
         const { isBlocked } = req.body; // ফ্রন্টএন্ড থেকে true অথবা false পাঠানো হবে
@@ -556,7 +602,7 @@ async function run() {
 
     //finishing
     //get all data, proposal, task, user collection
-    app.get("/api/allData", verifyToken, async (req, res) => {
+    app.get("/api/allData", async (req, res) => {
       try {
         const users = await userCollection.find({}).toArray();
         const proposals = await proposalsCollection.find({}).toArray();
