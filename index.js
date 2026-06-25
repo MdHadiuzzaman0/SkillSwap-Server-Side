@@ -227,11 +227,17 @@ async function run() {
       }
     });
 
-    //get proposal data
-    app.get('/proposals/:freelancerEmail', verifyToken, async (req, res) => {
+    // get proposal data using $or (Handles both Freelancer & Client Emails)
+    app.get('/proposals/:email', verifyToken, async (req, res) => {
       try {
-        const email = req.params.freelancerEmail;
-        const query = { freelancer_email: email };
+        const email = req.params.email;
+        const query = {
+          $or: [
+            { freelancer_email: email },
+            { client_email: email }
+          ]
+        };
+
         const result = await proposalsCollection.find(query).toArray();
         res.status(200).send(result);
       } catch (error) {
@@ -328,7 +334,7 @@ async function run() {
     //update freelancer earnings
     app.post("/update-earnings", verifyToken, async (req, res) => {
       try {
-        const { email, totalEarnings } = req.body;
+        const { email, earnings } = req.body;
 
         if (!email) {
           return res.status(400).json({ success: false, message: "Email is required" });
@@ -336,7 +342,7 @@ async function run() {
 
         const result = await userCollection.updateOne(
           { email: email },
-          { $set: { totalEarnings: totalEarnings } }
+          { $set: { totalEarnings: earnings } }
         );
 
         if (result.matchedCount === 0) {
