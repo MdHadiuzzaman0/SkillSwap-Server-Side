@@ -364,7 +364,7 @@ async function run() {
     app.post("/post-task", verifyToken, async (req, res) => {
       try {
         const newTask = req.body;
-        if (!newTask.title || !newTask.clientEmail) {
+        if (!newTask.title || !newTask.client_email) {
           return res.status(400).json({ success: false, message: "Required data is missing." });
         }
         const result = await taskCollection.insertOne(newTask);
