@@ -43,7 +43,7 @@ const verifyToken = async (req, res, next) => {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const database = client.db("SkillSwap");
     const userCollection = database.collection("userCollection");
     const taskCollection = database.collection("taskCollection");
